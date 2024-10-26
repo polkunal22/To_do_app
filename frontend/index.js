@@ -391,7 +391,7 @@ async function initializePushNotifications() {
         console.log("User subscribed to push notifications:", subscription);
 
         // Send the subscription to the backend
-        await fetch("http://localhost:5000/subscribe", {
+        await fetch("https://to-do-app-alpha-sepia.vercel.app/subscribe", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
