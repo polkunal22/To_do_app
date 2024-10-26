@@ -36,7 +36,7 @@ body {
     justify-content: center;
     align-items: center;
     background-color: rgb(4, 4, 35);
-    background-image: url(point.jpg);
+    background-image: url(./resources/images/point.jpg);
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -424,7 +424,7 @@ body {
 /* Base background styles */
 body {
     background-color: rgb(4, 4, 35);
-    background-image: url(point.jpg);
+    background-image: url(./resources/images/point.jpg);
     background-position: center;
     background-repeat: no-repeat;
     background-size: 100% 100%;

@@ -353,7 +353,7 @@ async function initializePushNotifications() {
   try {
     // Fetch the VAPID public key from the backend
     const response = await fetch(
-      "https://to-do-app-dx8u.vercel.app/api/public-key"
+      "https://to-do-app-alpha-sepia.vercel.app/api/public-key"
     );
     const data = await response.json();
     const vapidPublicKey = data.publicKey;
