@@ -1,88 +1,81 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="bumblebee">
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- css -->
+    <meta name="theme-color" content="#111827">
+    <meta name="description" content="A simple, polished task planner with due-date reminders.">
     <link rel="stylesheet" href="style.css">
-    <!--Icons-->
-    <link href='https://unpkg.com/boxicons@2.1.2/css/boxicons.min.css' rel='stylesheet'>
+    <link href="https://unpkg.com/boxicons@2.1.2/css/boxicons.min.css" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="./resources/images/to_do_icon.jpg">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-    <title>To Do Application</title>
+    <title>My Tasks</title>
 </head>
-
 <body>
-
-    <!-- main todo container -->
-    <div class="container">
-        <!-- header that has input and add button -->
-        <header>
-            <h1>Todo List</h1>
-
-            <div class="input-section">
-                <div class="w-full max-w-xs d-flex gap-2">
-                    <textarea id="todo-input" placeholder="📑 Add your todo here..." class="input input-txt"></textarea>
-                    <input type="datetime-local" id="dueDate" class="input input-date">
+    <main class="app-shell">
+        <section class="container" aria-labelledby="page-title">
+            <header class="app-header">
+                <div class="heading-group">
+                    <div class="brand-mark" aria-hidden="true"><i class="bx bx-check"></i></div>
+                    <div>
+                        <p class="eyebrow">DAILY PLANNER</p>
+                        <h1 id="page-title">My tasks</h1>
+                        <p id="today-label" class="today-label"></p>
+                    </div>
                 </div>
+                <div id="task-progress" class="task-progress" aria-label="Completion progress">
+                    <div class="progress-center">
+                        <strong id="progress-value">0%</strong>
+                        <span>done</span>
+                    </div>
+                </div>
+            </header>
 
-                <button id="add-button" class="btn btn-add ">
-                    <i class="bx bx-plus bx-sm"></i>
+            <form id="todo-form" class="task-form">
+                <label class="field task-field" for="todo-input">
+                    <span>Task</span>
+                    <textarea id="todo-input" rows="1" maxlength="240" placeholder="What needs to be done?" required></textarea>
+                </label>
+                <label class="field date-field" for="dueDate">
+                    <span>Due date &amp; time</span>
+                    <input type="datetime-local" id="dueDate" required>
+                </label>
+                <button id="add-button" class="btn btn-primary" type="submit">
+                    <i class="bx bx-plus" aria-hidden="true"></i>
+                    <span id="submit-label">Add task</span>
                 </button>
-            </div>
-        </header>
+                <button id="cancel-edit" class="btn btn-secondary hidden" type="button">Cancel</button>
+            </form>
 
-        <!-- delete buttons -->
-
-        <div class="todos-filter">
-
-            <button id="delete-selected" class="btn btn-ghost delete-selected-btn">
-                Delete Completed
-            </button>
-            <button id="delete-all" class="btn btn-ghost delete-all-btn">
-                Delete All
-            </button>
-        </div>
-
-
-        <!-- this is the dynamic content which dds ups all the todos -->
-        <ul id="all-todos" class="todos-list">
-
-        </ul>
-
-
-        <!-- dropdown throgh which we can apply filters -->
-        <div class="filters">
-            <div class="dropdown">
-                <button class="dropbtn">Filter</button>
-                <div class="dropdown-content">
-                    <a href="#" id="all">All</a>
-                    <a href="#" id="rem">Pending</a>
-                    <a href="#" id="com">Completed</a>
+            <div class="toolbar">
+                <div class="filter-tabs" role="group" aria-label="Filter tasks">
+                    <button class="filter-btn active" type="button" data-filter="all">All</button>
+                    <button class="filter-btn" type="button" data-filter="pending">Pending</button>
+                    <button class="filter-btn" type="button" data-filter="completed">Completed</button>
+                </div>
+                <div class="toolbar-meta">
+                    <span><strong id="r-count">0</strong> tasks</span>
+                    <button id="delete-selected" class="text-btn" type="button">Clear completed</button>
                 </div>
             </div>
 
-            <!-- value showing completed task and all -->
-            <div class="completed-task">
-                <p>Completed: <span id="c-count">0</span></p>
+            <div id="empty-state" class="empty-state">
+                <i class="bx bx-check-circle" aria-hidden="true"></i>
+                <h2>No tasks yet</h2>
+                <p>Add your first task and give your day some direction.</p>
             </div>
-            <div class="remaining-task">
-                <p>Total Tasks: <span id="r-count">0</span></p>
-            </div>
-        </div>
+            <ul id="all-todos" class="todos-list" aria-live="polite"></ul>
 
-        <!-- Add notification control div -->
-        <div id="notification-controls" class="notification-controls" style="display: none;">
-            <button id="stop-alarm" class="btn btn-error">Stop Alarm</button>
-            <button id="clear-notification" class="btn btn-ghost">Clear Notification</button>
-        </div>
-    </div>
+            <footer class="app-footer">
+                <div class="footer-progress">
+                    <div class="progress-track"><span id="progress-bar"></span></div>
+                    <p><span id="c-count">0</span> completed</p>
+                </div>
+                <button id="delete-all" class="text-btn danger" type="button">Delete all</button>
+            </footer>
+        </section>
+    </main>
 
-    <!-- JS -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="index.js"></script>
 </body>
-
 </html>

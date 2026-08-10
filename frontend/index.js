@@ -1,427 +1,247 @@
-// index.js
-let swRegistration = null;
-const notifiedTasks = new Set(); // Track notified tasks
-var todoList = [];
-var comdoList = [];
-var remList = [];
-var addButton = document.getElementById("add-button");
-var todoInput = document.getElementById("todo-input");
-var deleteAllButton = document.getElementById("delete-all");
-var allTodos = document.getElementById("all-todos");
-var deleteSButton = document.getElementById("delete-selected");
+const todoForm = document.getElementById('todo-form');
+const todoInput = document.getElementById('todo-input');
+const dueDateInput = document.getElementById('dueDate');
+const allTodos = document.getElementById('all-todos');
+const emptyState = document.getElementById('empty-state');
+const submitLabel = document.getElementById('submit-label');
+const addButton = document.getElementById('add-button');
+const cancelEditButton = document.getElementById('cancel-edit');
+const toast = document.getElementById('toast');
 
-// Initial size settings
-const initialHeight = todoInput.scrollHeight; // Get the initial height
+let todoList = loadTodos();
+let activeFilter = 'all';
+let editingId = null;
+let toastTimer;
+const notifiedTasks = new Set();
 
-// Set initial height to prevent extra rows initially
-todoInput.style.height = initialHeight + "px";
+document.getElementById('today-label').textContent = new Intl.DateTimeFormat(undefined, {
+  weekday: 'long', month: 'long', day: 'numeric'
+}).format(new Date());
 
-// Event listener for Enter key
-todoInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter" && e.shiftKey) {
-    e.preventDefault(); // Prevent default Enter behavior for Shift+Enter
-    todoInput.value += "\n"; // Add a new line
-    adjustHeight(); // Adjust height based on content
-  } else if (e.key === "Enter") {
-    e.preventDefault(); // Prevent default Enter behavior
-    add(); // Call your add function
-  }
-});
-
-// Event listener for Down Arrow to move cursor down
-todoInput.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown") {
-    e.preventDefault(); // Prevent default down arrow behavior
-    todoInput.value += "\n"; // Add a new line
-    adjustHeight(); // Adjust height based on content
-  }
-});
-
-// Adjust the rows of the textarea dynamically
-todoInput.addEventListener("input", function () {
-  // Reset height only if more than one line is present
-  if (this.value.split("\n").length > 1) {
-    adjustHeight(); // Adjust height based on scrollHeight
-  } else {
-    // Reset to initial height if there's text on one line or it's empty
-    this.style.height = initialHeight + "px"; // Maintain initial height for single-line text
-  }
-});
-
-// Function to adjust the textarea height
-function adjustHeight() {
-  todoInput.style.height = "auto"; // Reset the height to auto to shrink back if needed
-  // Expand based on scrollHeight
-  todoInput.style.height =
-    Math.max(todoInput.scrollHeight, initialHeight) + "px";
-}
-// Initialize push notifications
-async function initializePushNotifications() {
+function loadTodos() {
   try {
-    if ("serviceWorker" in navigator && "PushManager" in window) {
-      console.log("Registering service worker...");
-
-      swRegistration = await navigator.serviceWorker.register(
-        "service-worker.js",
-        {
-          scope: "/frontend/",
-          updateViaCache: "none",
-        }
-      );
-
-      console.log("Service Worker registered:", swRegistration);
-
-      if (Notification.permission === "granted") {
-        console.log("Notification permission already granted");
-      } else {
-        const permission = await Notification.requestPermission();
-        console.log("Notification permission status:", permission);
-      }
-
-      console.log("Push notification setup complete");
-    } else {
-      console.warn("Push messaging is not supported");
-    }
-  } catch (error) {
-    console.error("Error setting up push notifications:", error);
+    const saved = JSON.parse(localStorage.getItem('todoList'));
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
   }
 }
 
-// Event listeners
-addButton.addEventListener("click", add);
-deleteAllButton.addEventListener("click", deleteAll);
-deleteSButton.addEventListener("click", deleteS);
-
-// Local Storage Functions
-function saveToLocalStorage() {
-  localStorage.setItem("todoList", JSON.stringify(todoList));
+function saveTodos() {
+  localStorage.setItem('todoList', JSON.stringify(todoList));
 }
 
-function loadFromLocalStorage() {
-  const savedTodos = localStorage.getItem("todoList");
-  if (savedTodos) {
-    todoList = JSON.parse(savedTodos);
-    update();
-    addinmain(todoList);
-  }
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
 }
 
-// Event delegation
-document.addEventListener("click", (e) => {
-  if (
-    e.target.className.split(" ")[0] == "complete" ||
-    e.target.className.split(" ")[0] == "ci"
-  ) {
-    completeTodo(e);
-  }
-  if (
-    e.target.className.split(" ")[0] == "delete" ||
-    e.target.className.split(" ")[0] == "di"
-  ) {
-    deleteTodo(e);
-  }
-  if (e.target.id == "all") viewAll();
-  if (e.target.id == "rem") viewRemaining();
-  if (e.target.id == "com") viewCompleted();
-});
-
-// Testing Functions
-function addTestTask() {
-  const now = new Date();
-  const testDate = new Date(now.getTime() + 10000); // 10 seconds from now
-
-  const newTask = {
-    task: "Test Task - Due in 10 seconds",
-    id: Date.now().toString(),
-    complete: false,
-    dueDate: testDate.getTime(),
-  };
-
-  todoList.push(newTask);
-  update();
-  addinmain(todoList);
-  saveToLocalStorage();
-
-  console.log(`Test task scheduled for: ${testDate.toLocaleString()}`);
+function resizeInput() {
+  todoInput.style.height = '48px';
+  todoInput.style.height = `${Math.min(todoInput.scrollHeight, 110)}px`;
 }
 
-function checkNotificationStatus() {
-  console.log("Checking notification status...");
-  console.log("Notification Permission:", Notification.permission);
-  console.log("Service Worker Registration:", swRegistration);
-
-  if (swRegistration) {
-    console.log("Service Worker State:", swRegistration.active?.state);
-  }
+function toLocalInputValue(timestamp) {
+  const date = new Date(timestamp);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-// Notification Function
-async function notifyUser(task) {
-  try {
-    // Check if already notified
-    if (notifiedTasks.has(task.id)) {
-      return;
-    }
-
-    // Play alarm sound
-    // var audio = new Audio("./resources/audio/alarm.mp3");
-    // await audio.play();
-
-    // Mark as notified
-    notifiedTasks.add(task.id);
-
-    if (Notification.permission === "granted" && swRegistration) {
-      const options = {
-        body: `Task "${task.task}" is due!`,
-        icon: "./resources/images/notification-icon.png",
-        badge: "./resources/images/notification-badge.png",
-        vibrate: [100, 50, 100],
-        data: {
-          task: task,
-          timestamp: Date.now(),
-        },
-        actions: [
-          {
-            action: "complete",
-            title: "Mark Complete",
-          },
-          {
-            action: "dismiss",
-            title: "Dismiss",
-          },
-        ],
-      };
-
-      await swRegistration.showNotification("Task Reminder", options);
-    }
-  } catch (error) {
-    console.error("Error showing notification:", error);
-  }
+function resetForm() {
+  editingId = null;
+  todoForm.reset();
+  submitLabel.textContent = 'Add task';
+  addButton.querySelector('i').className = 'bx bx-plus';
+  cancelEditButton.classList.add('hidden');
+  resizeInput();
 }
 
-// Task Management Functions
-function update() {
-  comdoList = todoList.filter((ele) => ele.complete);
-  remList = todoList.filter((ele) => !ele.complete);
-  document.getElementById("r-count").innerText = todoList.length.toString();
-  document.getElementById("c-count").innerText = comdoList.length.toString();
+function startEdit(id) {
+  const todo = todoList.find(item => item.id === id);
+  if (!todo) return;
+  editingId = id;
+  todoInput.value = todo.task;
+  dueDateInput.value = toLocalInputValue(todo.dueDate);
+  submitLabel.textContent = 'Save';
+  addButton.querySelector('i').className = 'bx bx-check';
+  cancelEditButton.classList.remove('hidden');
+  resizeInput();
+  todoInput.focus();
+  todoForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function add() {
-  var value = todoInput.value.trim();
-  var dueDate = document.getElementById("dueDate").value;
+todoForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const task = todoInput.value.trim();
+  const dueDate = new Date(dueDateInput.value).getTime();
 
-  if (value === "" || dueDate === "") {
-    alert("😮 Task and due date cannot be empty");
+  if (!task || !Number.isFinite(dueDate)) {
+    showToast('Add a task and choose its due date.');
     return;
   }
 
-  const dueDateTime = new Date(dueDate).getTime();
+  if (editingId) {
+    const todo = todoList.find(item => item.id === editingId);
+    if (todo) Object.assign(todo, { task, dueDate });
+    showToast('Task updated');
+  } else {
+    todoList.unshift({ task, dueDate, id: String(Date.now()), complete: false });
+    showToast('Task added');
+  }
 
-  const newTask = {
-    task: value,
-    id: Date.now().toString(),
-    complete: false,
-    dueDate: dueDateTime,
-  };
+  saveTodos();
+  resetForm();
+  render();
+});
 
-  todoList.push(newTask);
-  todoInput.value = "";
-  document.getElementById("dueDate").value = "";
-  todoInput.style.height = initialHeight + "px"; // Reset height after adding
+todoInput.addEventListener('input', resizeInput);
+todoInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    todoForm.requestSubmit();
+  }
+});
 
-  update();
-  addinmain(todoList);
-  saveToLocalStorage();
-}
-
-function addinmain(todoList) {
-  allTodos.innerHTML = "";
-  todoList.forEach((element) => {
-    var x = `<li id=${element.id} class="todo-item">
-                <div>
-                    <p id="task"> ${element.complete
-        ? `<strike>${element.task}</strike>`
-        : element.task
-      } </p>
-                    <small class="text-gray-500">
-                        Due on ${new Date(element.dueDate).toLocaleString()}
-                    </small>
-                </div>
-                <div class="todo-actions">
-                    <button class="complete btn btn-success">
-                        <i class="ci bx bx-check bx-sm"></i>
-                    </button>
-                    <button class="delete btn btn-error" >
-                        <i class="di bx bx-trash bx-sm"></i>
-                    </button>
-                </div>
-            </li>`;
-    allTodos.innerHTML += x;
+// Browsers fire either `input` or `change` when the final time segment is picked.
+// Blur on the next frame so the native calendar has time to commit the value first.
+function closeDateTimePicker() {
+  if (!dueDateInput.value) return;
+  window.requestAnimationFrame(() => {
+    dueDateInput.blur();
   });
 }
 
-// Check tasks periodically
+dueDateInput.addEventListener('input', closeDateTimePicker);
+dueDateInput.addEventListener('change', closeDateTimePicker);
+
+cancelEditButton.addEventListener('click', resetForm);
+
+document.querySelectorAll('.filter-btn').forEach(button => {
+  button.addEventListener('click', () => {
+    activeFilter = button.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(item => item.classList.toggle('active', item === button));
+    render();
+  });
+});
+
+document.getElementById('delete-selected').addEventListener('click', () => {
+  const count = todoList.filter(item => item.complete).length;
+  if (!count) return showToast('No completed tasks to clear');
+  todoList = todoList.filter(item => !item.complete);
+  if (editingId && !todoList.some(item => item.id === editingId)) resetForm();
+  saveTodos();
+  render();
+  showToast(`${count} completed ${count === 1 ? 'task' : 'tasks'} cleared`);
+});
+
+document.getElementById('delete-all').addEventListener('click', () => {
+  if (!todoList.length) return showToast('Your list is already empty');
+  if (!window.confirm('Delete every task? This cannot be undone.')) return;
+  todoList = [];
+  resetForm();
+  saveTodos();
+  render();
+  showToast('All tasks deleted');
+});
+
+function filteredTodos() {
+  if (activeFilter === 'pending') return todoList.filter(item => !item.complete);
+  if (activeFilter === 'completed') return todoList.filter(item => item.complete);
+  return todoList;
+}
+
+function makeButton(label, icon, className, handler) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = className;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = `<i class="bx ${icon}" aria-hidden="true"></i>`;
+  button.addEventListener('click', handler);
+  return button;
+}
+
+function render() {
+  const visibleTodos = filteredTodos();
+  allTodos.replaceChildren();
+  emptyState.classList.toggle('hidden', visibleTodos.length > 0);
+
+  const completed = todoList.filter(item => item.complete).length;
+  document.getElementById('r-count').textContent = todoList.length;
+  document.getElementById('c-count').textContent = completed;
+  const progress = todoList.length ? Math.round((completed / todoList.length) * 100) : 0;
+  document.getElementById('progress-value').textContent = `${progress}%`;
+  document.getElementById('task-progress').style.setProperty('--progress', `${progress * 3.6}deg`);
+  document.getElementById('progress-bar').style.width = `${progress}%`;
+
+  if (!visibleTodos.length) {
+    const title = emptyState.querySelector('h2');
+    const copy = emptyState.querySelector('p');
+    title.textContent = activeFilter === 'all' ? 'No tasks yet' : `No ${activeFilter} tasks`;
+    copy.textContent = activeFilter === 'all'
+      ? 'Add your first task and give your day some direction.'
+      : 'Try another filter to see the rest of your list.';
+  }
+
+  visibleTodos.forEach(todo => {
+    const item = document.createElement('li');
+    item.className = `todo-item${todo.complete ? ' is-complete' : ''}`;
+
+    const check = makeButton(todo.complete ? 'Mark pending' : 'Mark complete', 'bx-check', 'check-btn', () => {
+      todo.complete = !todo.complete;
+      saveTodos();
+      render();
+    });
+
+    const copy = document.createElement('div');
+    copy.className = 'task-copy';
+    const title = document.createElement('p');
+    title.className = 'task-title';
+    title.textContent = todo.task;
+    const date = document.createElement('span');
+    const isOverdue = !todo.complete && todo.dueDate < Date.now();
+    date.className = `task-date${isOverdue ? ' overdue' : ''}`;
+    const prefix = '';
+    date.innerHTML = '<i class="bx bx-calendar" aria-hidden="true"></i>';
+    date.append(document.createTextNode(prefix + new Date(todo.dueDate).toLocaleString([], {
+      dateStyle: 'medium', timeStyle: 'short'
+    })));
+    if (isOverdue) {
+      const overdue = document.createElement('span');
+      overdue.className = 'status-pill';
+      overdue.textContent = 'Overdue';
+      date.append(overdue);
+    }
+    copy.append(title, date);
+
+    const actions = document.createElement('div');
+    actions.className = 'todo-actions';
+    actions.append(
+      makeButton('Edit task', 'bx-pencil', 'icon-btn edit', () => startEdit(todo.id)),
+      makeButton('Delete task', 'bx-trash', 'icon-btn delete', () => {
+        todoList = todoList.filter(item => item.id !== todo.id);
+        if (editingId === todo.id) resetForm();
+        saveTodos();
+        render();
+        showToast('Task deleted');
+      })
+    );
+    item.append(check, copy, actions);
+    allTodos.append(item);
+  });
+}
+
 setInterval(() => {
-  const now = Date.now();
-  todoList.forEach((task) => {
-    if (!task.complete && task.dueDate <= now) {
-      notifyUser(task);
+  todoList.forEach(task => {
+    if (!task.complete && task.dueDate <= Date.now() && !notifiedTasks.has(task.id)) {
+      notifiedTasks.add(task.id);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Task reminder', { body: `“${task.task}” is due.` });
+      }
     }
   });
 }, 1000);
 
-// Task Actions
-function deleteTodo(e) {
-  var deleted = e.target.parentElement.parentElement.getAttribute("id");
-  todoList = todoList.filter((ele) => ele.id != deleted);
-  update();
-  addinmain(todoList);
-  saveToLocalStorage();
-}
-
-function completeTodo(e) {
-  var completed = e.target.parentElement.parentElement.getAttribute("id");
-  todoList.forEach((obj) => {
-    if (obj.id == completed) {
-      obj.complete = !obj.complete;
-    }
-  });
-  update();
-  addinmain(todoList);
-  saveToLocalStorage();
-}
-
-function deleteAll() {
-  todoList = [];
-  update();
-  addinmain(todoList);
-  saveToLocalStorage();
-}
-
-function deleteS() {
-  todoList = todoList.filter((ele) => !ele.complete);
-  update();
-  addinmain(todoList);
-  saveToLocalStorage();
-}
-
-// View Filters
-function viewCompleted() {
-  addinmain(comdoList);
-}
-
-function viewRemaining() {
-  addinmain(remList);
-}
-
-function viewAll() {
-  addinmain(todoList);
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  loadFromLocalStorage();
-  initializePushNotifications();
-
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.addEventListener("message", (event) => {
-      if (event.data && event.data.action === "completeTask") {
-        const taskId = event.data.taskId;
-        markTaskComplete(taskId); // Call the function to complete the task
-      }
-    });
-  }
-
-  // Log initial status
-  console.log("Initial Notification Permission:", Notification.permission);
-  console.log("Service Worker Support:", "serviceWorker" in navigator);
-});
-
-function markTaskComplete(taskId) {
-  todoList.forEach((task) => {
-    if (task.id === taskId) {
-      task.complete = true; // Mark the task as complete
-    }
-  });
-
-  update(); // Update the UI
-  addinmain(todoList); // Refresh the task list
-  saveToLocalStorage(); // Save the updated list
-}
-
-async function initializePushNotifications() {
-  try {
-    // Fetch the VAPID public key from the backend
-    const response = await fetch(
-      "https://to-do-app-alpha-sepia.vercel.app/api/public-key"
-    );
-    const data = await response.json();
-    const vapidPublicKey = data.publicKey;
-
-    if ("serviceWorker" in navigator && "PushManager" in window) {
-      console.log("Registering service worker...");
-
-      swRegistration = await navigator.serviceWorker.register(
-        "service-worker.js",
-        {
-          scope: "/frontend/",
-          updateViaCache: "none",
-        }
-      );
-
-      console.log("Service Worker registered:", swRegistration);
-
-      if (Notification.permission === "granted") {
-        console.log("Notification permission already granted");
-      } else {
-        const permission = await Notification.requestPermission();
-        console.log("Notification permission status:", permission);
-      }
-
-      if (Notification.permission === "granted") {
-        // Convert the VAPID public key to a Uint8Array (required by PushManager)
-        const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-
-        // Subscribe the user to push notifications
-        const subscription = await swRegistration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey,
-        });
-
-        console.log("User subscribed to push notifications:", subscription);
-
-        // Send the subscription to the backend
-        await fetch("https://to-do-app-alpha-sepia.vercel.app/subscribe", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(subscription),
-        });
-
-        console.log("Subscription sent to the server");
-      }
-
-      console.log("Push notification setup complete");
-    } else {
-      console.warn("Push messaging is not supported");
-    }
-  } catch (error) {
-    console.error("Error setting up push notifications:", error);
-  }
-}
-
-// Helper function to convert the base64 VAPID key to Uint8Array
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
-}
+render();
+resizeInput();
